@@ -26,10 +26,14 @@ export default function NewProjectPage() {
     mutationFn: () => api.triggerDeploy(source.trim(), buildCommand.trim() || undefined),
     onSuccess: (rec) => {
       qc.invalidateQueries({ queryKey: ["portal"] })
-      // portal returns newest deploy; capture id for log viewer
-      const id = (rec as { deployId?: string })?.deployId ?? (rec as unknown as string)
-      if (typeof id === "string") setDeployId(id)
-      else if (rec && typeof rec === "object" && "deployId" in rec) setDeployId((rec as { deployId: string }).deployId)
+      const id = (rec as { deployId?: string })?.deployId
+      if (id) setDeployId(id)
+      setStep(4)
+    },
+    onError: (err: unknown) => {
+      qc.invalidateQueries({ queryKey: ["portal"] })
+      const e = err as Error & { deployId?: string }
+      if (e.deployId) setDeployId(e.deployId)
       setStep(4)
     },
   })
@@ -146,8 +150,19 @@ export default function NewProjectPage() {
                 <Button variant="outline" onClick={() => setStep(3)}>Back</Button>
                 {deployId && <Button variant="ghost" onClick={() => window.open(`/deploys/${encodeURIComponent(deployId)}`, "_blank")}>View deploy →</Button>}
               </div>
-              {trigger.isError && <p className="mt-3 rounded bg-destructive/10 px-3 py-2 font-mono text-xs text-destructive">{(trigger.error as Error).message}</p>}
-              {trigger.isSuccess && <p className="mt-3 rounded bg-emerald-500/10 px-3 py-2 font-mono text-xs text-emerald-700">Deploy triggered — follow logs below. Polls registry via SSE.</p>}
+              {trigger.isError && (
+                <div className="mt-3 rounded border border-destructive/20 bg-destructive/10 px-3 py-2">
+                  <p className="font-mono text-xs font-medium text-destructive">
+                    {(trigger.error as Error & { _tag?: string })?._tag ?? "Deploy failed"} — {(trigger.error as Error).message}
+                  </p>
+                  {(trigger.error as Error & { deployId?: string })?.deployId && (
+                    <a href={`/deploys/${encodeURIComponent((trigger.error as Error & { deployId?: string }).deployId!)}`} className="mt-1 inline-flex font-mono text-[11px] text-destructive underline decoration-dotted underline-offset-4">
+                      View failed deploy {(trigger.error as Error & { deployId?: string }).deployId!.slice(0, 8)} logs →
+                    </a>
+                  )}
+                </div>
+              )}
+              {trigger.isSuccess && <p className="mt-3 rounded bg-emerald-500/10 px-3 py-2 font-mono text-xs text-emerald-700">Deploy triggered — follow logs below. Live via SSE.</p>}
               <p className="mt-3 font-mono text-[11px] text-muted-foreground">Equivalent CLI: <span className="text-foreground">bun run index.ts deploy "{source}"</span></p>
             </div>
 

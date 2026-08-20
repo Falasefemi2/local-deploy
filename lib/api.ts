@@ -57,11 +57,33 @@ export const api = {
       body: path ? JSON.stringify({ path }) : undefined,
     }),
 
-  triggerDeploy: (path: string, buildCommand?: string) =>
-    json<DeployRecord>(`${BASE}/api/deploy`, {
+  triggerDeploy: async (path: string, buildCommand?: string): Promise<DeployRecord> => {
+    const res = await fetch(`${BASE}/api/deploy`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path, buildCommand }),
-    }),
+    })
+    const text = await res.text()
+    let data: unknown = null
+    try {
+      data = text ? JSON.parse(text) : null
+    } catch {
+      data = text
+    }
+    if (!res.ok) {
+      const msg =
+        (data as { message?: string })?.message ??
+        (typeof data === "string" ? data : JSON.stringify(data)) ??
+        `Request failed ${res.status}`
+      const err = new Error(msg) as Error & { deployId?: string; project?: string; record?: DeployRecord; _tag?: string }
+      err.deployId = (data as { deployId?: string })?.deployId
+      err.project = (data as { project?: string })?.project
+      err.record = (data as { record?: DeployRecord })?.record
+      err._tag = (data as { _tag?: string })?._tag
+      throw err
+    }
+    return data as DeployRecord
+  },
 
   portalOrigin: PORTAL_URL,
 }
