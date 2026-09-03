@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
 
 export function PortalShell({
   children,
@@ -20,9 +21,9 @@ export function PortalShell({
               P
             </span>
             <span className="text-[13px] font-[650] tracking-tight">portal</span>
-            <span className="hidden rounded-full border bg-muted px-2 py-0.5 font-mono text-[11px] leading-none text-muted-foreground sm:inline-flex">
+            <Badge variant="outline" className="hidden rounded-full bg-muted px-2 py-0.5 font-mono text-[11px] leading-none font-normal text-muted-foreground sm:inline-flex">
               local
-            </span>
+            </Badge>
           </Link>
 
           <span className="hidden h-4 w-px bg-border sm:block" />

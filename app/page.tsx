@@ -8,6 +8,9 @@ import { PortalShell } from "@/components/portal-shell"
 import { ProjectList } from "@/components/project-list"
 import { DeployHistory } from "@/components/deploy-history"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export default function Page() {
   const { data: projects, isPending, isError, error } = useQuery(projectsQuery)
@@ -29,17 +32,17 @@ export default function Page() {
       sidebar={
         isPending ? (
           <div className="flex flex-col gap-2 p-1">
-            <div className="h-4 w-24 rounded bg-muted" />
+            <Skeleton className="h-4 w-24" />
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-21.5 animate-pulse rounded-xl bg-muted/40" />
+              <Skeleton key={i} className="h-[86px] rounded-xl bg-muted/40" />
             ))}
           </div>
         ) : isError ? (
-          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
-            <p className="text-sm font-medium text-destructive">Failed to load projects</p>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{(error as Error).message}</p>
-            <p className="mt-2 font-mono text-[11px] text-muted-foreground">Check that portal serve is on :8080</p>
-          </div>
+          <Alert variant="destructive" className="rounded-xl border-destructive/20 bg-destructive/5 p-4">
+            <AlertTitle>Failed to load projects</AlertTitle>
+            <AlertDescription className="font-mono text-xs">{(error as Error).message}</AlertDescription>
+            <AlertDescription className="font-mono text-[11px]">Check that portal serve is on :8080</AlertDescription>
+          </Alert>
         ) : !projects?.length ? (
           <div className="px-3 py-8 text-center">
             <p className="text-sm font-[650]">No projects yet</p>
@@ -67,10 +70,10 @@ export default function Page() {
                 <div className="flex items-center gap-2">
                     <h1 className="text-[18px] font-bold tracking-tight">{selectedName}</h1>
                   {active?.productionDeployId && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                    <Badge variant="outline" className="gap-1.5 rounded-full border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
                       <span className="size-1.5 rounded-full bg-emerald-500" />
                       production
-                    </span>
+                    </Badge>
                   )}
                 </div>
                 <p className="mt-1 font-mono text-[11px] text-muted-foreground">
