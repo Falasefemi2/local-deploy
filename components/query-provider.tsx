@@ -1,6 +1,7 @@
 "use client"
 
 import { QueryClientProvider } from "@tanstack/react-query"
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
 import * as React from "react"
 import { makeQueryClient } from "@/lib/query-client"
 
@@ -13,8 +14,15 @@ function getQueryClient() {
 }
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
-  const clientRef = React.useRef(getQueryClient())
+  // useState initializer (TanStack-recommended singleton pattern) — created
+  // once per component lifetime, never read from a ref during render.
+  const [client] = React.useState(() => getQueryClient())
   return (
-    <QueryClientProvider client={clientRef.current}>{children}</QueryClientProvider>
+    <QueryClientProvider client={client}>
+      {children}
+      {process.env.NODE_ENV === "development" && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
+    </QueryClientProvider>
   )
 }

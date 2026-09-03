@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils"
 import { StatusDot, StatusLabel } from "./status-dot"
 import { useDeployEvents } from "@/hooks/use-deploy-events"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 function age(iso: string) {
   const mins = Math.floor((Date.now() - +new Date(iso)) / 60000)
@@ -53,9 +56,9 @@ function DeployRow({
           <span className="font-mono text-[12.5px] font-[550] tracking-tight">{deploy.deployId}</span>
           <StatusLabel status={status} />
           {isProduction && (
-            <span className="inline-flex items-center rounded-full border border-foreground/15 bg-foreground px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-background">
+            <Badge variant="outline" className="border-foreground/15 bg-foreground px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-background">
               production
-            </span>
+            </Badge>
           )}
           <span className="ml-auto font-mono text-[11px] text-muted-foreground">{age(deploy.createdAt)} ago</span>
         </div>
@@ -111,9 +114,9 @@ export function DeployHistory({
     return (
       <div className="flex flex-col gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div
+          <Skeleton
             key={i}
-            className="h-[76px] animate-pulse rounded-xl border bg-muted/30"
+            className="h-[76px] rounded-xl border bg-muted/30"
             style={{ animationDelay: `${i * 60}ms` }}
           />
         ))}
@@ -123,10 +126,10 @@ export function DeployHistory({
 
   if (isError) {
     return (
-      <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-6 text-sm">
-        <p className="font-medium text-destructive">Failed to load deploys</p>
-        <p className="mt-1 font-mono text-xs text-muted-foreground">{(error as Error).message}</p>
-      </div>
+      <Alert variant="destructive" className="rounded-xl border-destructive/20 bg-destructive/5 px-4 py-6">
+        <AlertTitle>Failed to load deploys</AlertTitle>
+        <AlertDescription className="font-mono text-xs">{(error as Error).message}</AlertDescription>
+      </Alert>
     )
   }
 

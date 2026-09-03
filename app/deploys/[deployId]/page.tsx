@@ -11,13 +11,25 @@ import { BuildLogViewer } from "@/components/build-log-viewer"
 import { StatusDot, StatusLabel } from "@/components/status-dot"
 import { useDeployEvents } from "@/hooks/use-deploy-events"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 
 function Masked({ value }: { value: string }) {
   const [show, setShow] = React.useState(false)
   return (
     <span className="inline-flex items-center gap-2 font-mono text-xs">
-      <span className={cn("rounded bg-muted px-1.5 py-0.5", !show && "blur-[4px] select-none")}>{value}</span>
+      <span className={cn("rounded bg-muted px-1.5 py-0.5", !show && "blur-xs select-none")}>{value}</span>
       <button onClick={() => setShow((v) => !v)} className="text-[11px] font-medium text-muted-foreground underline decoration-dotted underline-offset-4">
         {show ? "hide" : "reveal"}
       </button>
@@ -38,51 +50,54 @@ export default function DeployDetailPage() {
 
   const promote = useMutation({
     mutationFn: () => api.promote(deployId),
-    onMutate: async () => {
-      await qc.cancelQueries({ queryKey: portalKeys.deploy(deployId) })
-      const prev = qc.getQueryData(portalKeys.deploy(deployId))
-      // optimistic: keep status succeeded, show toast would go here
-      return { prev }
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.prev) qc.setQueryData(portalKeys.deploy(deployId), ctx.prev)
-    },
+    // No optimistic update: promote returns { ok: true } and moves the
+    // project's production pointer (projects query), not this deploy record —
+    // there is nothing meaningful to patch. Invalidate and refetch instead.
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["portal"] })
+      qc.invalidateQueries({ queryKey: portalKeys.all })
     },
   })
 
+  const [redeployOpen, setRedeployOpen] = React.useState(false)
+  const [redeployPath, setRedeployPath] = React.useState("")
+
   const redeploy = useMutation({
-    mutationFn: () => {
-      // need path — for local-first, use stored artifact project as hint; user can edit in creation flow
-      // For now require user to provide path via prompt if missing
-      const path = window.prompt("Redeploy from path or GitHub URL:", deploy?.project ?? "")
-      if (!path) return Promise.reject(new Error("cancelled"))
-      return api.redeploy(deployId, path)
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["portal"] }),
+    // Path is collected in the dialog below so the mutation fn stays pure.
+    mutationFn: (path: string) => api.redeploy(deployId, path),
+    onSuccess: () => setRedeployOpen(false),
+    onSettled: () => qc.invalidateQueries({ queryKey: portalKeys.all }),
   })
+
+  const openRedeploy = () => {
+    // need path — for local-first, use stored artifact project as hint; user can edit in creation flow
+    setRedeployPath(deploy?.project ?? "")
+    setRedeployOpen(true)
+  }
+
+  const confirmRedeploy = () => {
+    const path = redeployPath.trim()
+    if (!path) return
+    redeploy.mutate(path)
+  }
 
   if (isPending) {
     return (
-      <PortalShell sidebar={<div className="h-32 animate-pulse rounded-xl bg-muted/30" />}>
-        <div className="h-64 animate-pulse rounded-2xl bg-muted/30" />
+      <PortalShell sidebar={<Skeleton className="h-32 rounded-xl bg-muted/30" />}>
+        <Skeleton className="h-64 rounded-2xl bg-muted/30" />
       </PortalShell>
     )
   }
   if (isError || !deploy) {
     return (
       <PortalShell sidebar={<div />}>
-        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 text-sm">
-          <p className="font-medium text-destructive">Deploy not found</p>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">{(error as Error)?.message ?? deployId}</p>
+        <Alert variant="destructive" className="rounded-2xl border-destructive/20 bg-destructive/5 p-6">
+          <AlertTitle>Deploy not found</AlertTitle>
+          <AlertDescription className="font-mono text-xs">{(error as Error)?.message ?? deployId}</AlertDescription>
           <Button variant="outline" size="sm" className="mt-4" onClick={() => router.push("/")}>Back to projects</Button>
-        </div>
+        </Alert>
       </PortalShell>
     )
   }
-
-  const isProduction = false // could fetch project summary to know prod, but keep simple
 
   return (
     <PortalShell
@@ -124,7 +139,7 @@ export default function DeployDetailPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => redeploy.mutate()}
+                onClick={openRedeploy}
                 disabled={redeploy.isPending}
                 className="gap-1.5"
               >
@@ -157,11 +172,49 @@ export default function DeployDetailPage() {
           </div>
 
           {(promote.isError || redeploy.isError) && (
-            <p className="mt-3 rounded bg-destructive/10 px-3 py-2 font-mono text-xs text-destructive">
-              {(promote.error as Error)?.message ?? (redeploy.error as Error)?.message}
-            </p>
+            <Alert variant="destructive" className="mt-3 rounded border-destructive/20 bg-destructive/10 px-3 py-2">
+              <AlertDescription className="font-mono text-xs">
+                {(promote.error as Error)?.message ?? (redeploy.error as Error)?.message}
+              </AlertDescription>
+            </Alert>
           )}
-          {promote.isSuccess && <p className="mt-3 rounded bg-emerald-500/10 px-3 py-2 font-mono text-xs text-emerald-700">Promoted — production now points here.</p>}
+          {promote.isSuccess && (
+            <Alert className="mt-3 rounded border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
+              <AlertDescription className="font-mono text-xs text-emerald-700 dark:text-emerald-300">
+                Promoted — production now points here.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Dialog open={redeployOpen} onOpenChange={setRedeployOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Redeploy</DialogTitle>
+                <DialogDescription>
+                  Local path or GitHub URL — same pipeline as CLI.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="redeploy-path" className="text-xs font-[550]">Source path / GitHub URL</Label>
+                <Input
+                  id="redeploy-path"
+                  value={redeployPath}
+                  onChange={(e) => setRedeployPath(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") confirmRedeploy() }}
+                  placeholder={deploy?.project ?? ""}
+                  className="rounded-xl bg-background px-3 py-2.5 font-mono text-sm"
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setRedeployOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={confirmRedeploy} disabled={redeploy.isPending || !redeployPath.trim()}>
+                  {redeploy.isPending ? "Redeploying…" : "Redeploy"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* artifact + env */}
