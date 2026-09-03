@@ -24,6 +24,9 @@ export function BuildLogViewer({
     if (!el) return
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 24
     setIsAtBottom(near)
+    // If the user scrolls up, pause auto-scroll; scrolling back to the
+    // bottom resumes it. Updated at the source (scroll handler), not an effect.
+    setAutoScroll(near)
   }, [])
 
   React.useEffect(() => {
@@ -52,11 +55,7 @@ export function BuildLogViewer({
     setAutoScroll(true)
   }
 
-  // if user scrolls up, disable autoScroll
-  React.useEffect(() => {
-    if (!isAtBottom) setAutoScroll(false)
-    else setAutoScroll(true)
-  }, [isAtBottom])
+  // if user scrolls up, autoScroll is paused via checkBottom above
 
   if (!deployId) {
     return (

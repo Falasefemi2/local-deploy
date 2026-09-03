@@ -37,16 +37,10 @@ lib/api.ts           — typed fetch client  PORTAL_URL = NEXT_PUBLIC_PORTAL_URL
                      listProjects, listDeploys(project), getDeploy(id), promote(id), redeploy(id,path), triggerDeploy(path,buildCommand)
 ```
 
-All fetches go to `portal` directly (`PORTAL_URL + /api/*`). Next `app/api/*`
-handlers are thin proxies for SSR (`fetch(PORTAL + /api/…)`, CORS `*`) — also let
-`localhost:3000/api/projects` work when `PORTAL_URL` is unreachable:
-
-- `app/api/projects/route.ts` → `GET PORTAL/api/projects`
-- `app/api/projects/[project]/deploys/route.ts`
-- `app/api/deploys/[deployId]/route.ts`
-- `app/api/deploys/[deployId]/promote|redeploy/route.ts`
-- `app/api/deploys/[deployId]/logs|events/route.ts` — proxy SSE `text/event-stream`
-- `app/api/deploy/route.ts` — `POST PORTAL/api/deploy`
+All fetches go to `portal` directly (`PORTAL_URL + /api/*`). There is no
+Next BFF layer — `app/api/*` proxy handlers were removed; the client talks
+straight to `http://localhost:8080`, so the portal must allow direct
+browser access (CORS) when served from another origin.
 
 ## SSE (streams, not queries)
 
@@ -83,14 +77,14 @@ never `transition:all` (explicit `border-color,background-color,transform` 200ms
 promote(id) // POST /api/deploys/:id/promote
   onMutate: cancelQueries(deploy), snapshot prev
   onError: rollback
-  onSettled: invalidateQueries(['portal']) // refresh projects/deploys lists
+  onSettled: invalidateQueries(portalKeys.all) // refresh projects/deploys lists
 
 redeploy(id, path) // POST /api/deploys/:id/redeploy {path}
-  // path prompted via window.prompt(project) — local-first demo
-  onSuccess: invalidateQueries(['portal'])
+  // path prompted via window.prompt(project) in the click handler — local-first demo
+  onSettled: invalidateQueries(portalKeys.all)
 
 triggerDeploy(path, buildCommand) // POST /api/deploy
-  onSuccess: invalidateQueries(['portal']), capture deployId → log viewer
+  onSuccess: invalidateQueries(portalKeys.all), capture deployId → log viewer
 ```
 
 ## Adding shadcn components
@@ -117,7 +111,7 @@ Requires [Bun](https://bun.com) 1.3.x, Node 20+.
 ```bash
 bun install
 bun run dev      # http://localhost:3000 (Turbopack), hot reload
-bun run build    # next build (Turbopack) — typechecks, collects 10 routes
+bun run build    # next build (Turbopack) — typechecks, collects 4 page routes (no API routes)
 bun run lint     # eslint
 bun run format   # prettier --write "**/*.{ts,tsx}"
 bun run typecheck # tsc --noEmit (if script added) or bunx tsc --noEmit

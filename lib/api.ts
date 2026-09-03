@@ -22,16 +22,52 @@ export const PORTAL_URL =
 
 const BASE = PORTAL_URL
 
-async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+export class ApiError extends Error {
+  status: number
+  deployId?: string
+  project?: string
+  record?: DeployRecord
+  _tag?: string
+
+  constructor(message: string, status: number, body?: unknown) {
+    super(message)
+    this.name = "ApiError"
+    this.status = status
+    const b = body as
+      | { deployId?: string; project?: string; record?: DeployRecord; _tag?: string }
+      | null
+      | undefined
+    this.deployId = b?.deployId
+    this.project = b?.project
+    this.record = b?.record
+    this._tag = b?._tag
+  }
+}
+
+async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   })
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new Error(text || `Request failed ${res.status}`)
+  const text = await res.text().catch(() => "")
+  let data: unknown = null
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = text
   }
-  return res.json() as Promise<T>
+  if (!res.ok) {
+    const msg =
+      (data as { message?: string })?.message ??
+      (typeof data === "string" && data ? data : JSON.stringify(data)) ??
+      `Request failed ${res.status}`
+    throw new ApiError(msg, res.status, data)
+  }
+  return data as T
+}
+
+async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+  return request<T>(input, init)
 }
 
 export const api = {
@@ -57,33 +93,11 @@ export const api = {
       body: path ? JSON.stringify({ path }) : undefined,
     }),
 
-  triggerDeploy: async (path: string, buildCommand?: string): Promise<DeployRecord> => {
-    const res = await fetch(`${BASE}/api/deploy`, {
+  triggerDeploy: (path: string, buildCommand?: string): Promise<DeployRecord> =>
+    request<DeployRecord>(`${BASE}/api/deploy`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path, buildCommand }),
-    })
-    const text = await res.text()
-    let data: unknown = null
-    try {
-      data = text ? JSON.parse(text) : null
-    } catch {
-      data = text
-    }
-    if (!res.ok) {
-      const msg =
-        (data as { message?: string })?.message ??
-        (typeof data === "string" ? data : JSON.stringify(data)) ??
-        `Request failed ${res.status}`
-      const err = new Error(msg) as Error & { deployId?: string; project?: string; record?: DeployRecord; _tag?: string }
-      err.deployId = (data as { deployId?: string })?.deployId
-      err.project = (data as { project?: string })?.project
-      err.record = (data as { record?: DeployRecord })?.record
-      err._tag = (data as { _tag?: string })?._tag
-      throw err
-    }
-    return data as DeployRecord
-  },
+    }),
 
   portalOrigin: PORTAL_URL,
 }

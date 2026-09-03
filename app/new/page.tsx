@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
+import { portalKeys } from "@/lib/query-keys"
 import { PortalShell } from "@/components/portal-shell"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -25,13 +26,13 @@ export default function NewProjectPage() {
   const trigger = useMutation({
     mutationFn: () => api.triggerDeploy(source.trim(), buildCommand.trim() || undefined),
     onSuccess: (rec) => {
-      qc.invalidateQueries({ queryKey: ["portal"] })
+      qc.invalidateQueries({ queryKey: portalKeys.all })
       const id = (rec as { deployId?: string })?.deployId
       if (id) setDeployId(id)
       setStep(4)
     },
     onError: (err: unknown) => {
-      qc.invalidateQueries({ queryKey: ["portal"] })
+      qc.invalidateQueries({ queryKey: portalKeys.all })
       const e = err as Error & { deployId?: string }
       if (e.deployId) setDeployId(e.deployId)
       setStep(4)
@@ -66,10 +67,10 @@ export default function NewProjectPage() {
         </div>
       }
     >
-      <div className="mx-auto max-w-[720px]">
+      <div className="mx-auto max-w-180">
         {step === 1 && (
           <div className="rounded-2xl border bg-card p-6 shadow-sm">
-            <h1 className="text-[18px] font-[700] tracking-tight">Connect source</h1>
+            <h1 className="text-[18px] font-bold tracking-tight">Connect source</h1>
             <p className="mt-1 text-sm text-muted-foreground">Local path or GitHub URL. CLI uses the same — <span className="font-mono text-xs">portal deploy &lt;path&gt;</span></p>
             <div className="mt-5 flex flex-col gap-3">
               <label className="flex flex-col gap-1.5">
@@ -95,7 +96,7 @@ export default function NewProjectPage() {
 
         {step === 2 && (
           <div className="rounded-2xl border bg-card p-6 shadow-sm">
-            <h1 className="text-[18px] font-[700] tracking-tight">Build configuration</h1>
+            <h1 className="text-[18px] font-bold tracking-tight">Build configuration</h1>
             <p className="mt-1 text-sm text-muted-foreground">Detected via <span className="font-mono text-xs">portal.config.json</span> or <span className="font-mono text-xs">package.json</span> — override here.</p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-1.5 sm:col-span-2">
@@ -120,7 +121,7 @@ export default function NewProjectPage() {
 
         {step === 3 && (
           <div className="rounded-2xl border bg-card p-6 shadow-sm">
-            <h1 className="text-[18px] font-[700] tracking-tight">Environment</h1>
+            <h1 className="text-[18px] font-bold tracking-tight">Environment</h1>
             <p className="mt-1 text-sm text-muted-foreground">Masked in detail view. Stored server-side only — never in artifact.</p>
             <label className="mt-5 flex flex-col gap-1.5">
               <span className="text-xs font-[550]">Env vars (KEY=VALUE per line)</span>
@@ -137,7 +138,7 @@ export default function NewProjectPage() {
         {step === 4 && (
           <div className="flex flex-col gap-6">
             <div className="rounded-2xl border bg-card p-6 shadow-sm">
-              <h1 className="text-[18px] font-[700] tracking-tight">Trigger first deploy</h1>
+              <h1 className="text-[18px] font-bold tracking-tight">Trigger first deploy</h1>
               <dl className="mt-4 grid gap-2 font-mono text-xs">
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Source</dt><dd className="truncate text-right">{source || "—"}</dd></div>
                 <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Build</dt><dd>{buildCommand} → {outputDir}</dd></div>
@@ -163,7 +164,7 @@ export default function NewProjectPage() {
                 </div>
               )}
               {trigger.isSuccess && <p className="mt-3 rounded bg-emerald-500/10 px-3 py-2 font-mono text-xs text-emerald-700">Deploy triggered — follow logs below. Live via SSE.</p>}
-              <p className="mt-3 font-mono text-[11px] text-muted-foreground">Equivalent CLI: <span className="text-foreground">bun run index.ts deploy "{source}"</span></p>
+              <p className="mt-3 font-mono text-[11px] text-muted-foreground">Equivalent CLI: <span className="text-foreground">bun run index.ts deploy &quot;{source}&quot;</span></p>
             </div>
 
             {deployId ? <BuildLogViewer deployId={deployId} enabled /> : <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center font-mono text-xs text-muted-foreground">Deploy to stream logs</div>}

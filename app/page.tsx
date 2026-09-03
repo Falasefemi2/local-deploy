@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { projectsQuery } from "@/lib/queries"
+import { useSelectProject, useSelectedProject } from "@/stores/use-selected-project"
 import { PortalShell } from "@/components/portal-shell"
 import { ProjectList } from "@/components/project-list"
 import { DeployHistory } from "@/components/deploy-history"
@@ -10,13 +11,18 @@ import { Button } from "@/components/ui/button"
 
 export default function Page() {
   const { data: projects, isPending, isError, error } = useQuery(projectsQuery)
-  const [selected, setSelected] = React.useState<string | undefined>(undefined)
+  const selected = useSelectedProject()
+  const setSelected = useSelectProject()
 
-  React.useEffect(() => {
-    if (projects?.length && !selected) setSelected(projects[0]!.name)
-  }, [projects, selected])
+  // Default to the first project until the user picks one — derived during
+  // render instead of a setState-in-effect (no cascading render). Falls back
+  // to first if the stored selection no longer exists (e.g. project removed).
+  const selectedName =
+    selected && projects?.some((p) => p.name === selected)
+      ? selected
+      : projects?.[0]?.name
 
-  const active = projects?.find((p) => p.name === selected)
+  const active = projects?.find((p) => p.name === selectedName)
 
   return (
     <PortalShell
@@ -25,7 +31,7 @@ export default function Page() {
           <div className="flex flex-col gap-2 p-1">
             <div className="h-4 w-24 rounded bg-muted" />
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-[86px] animate-pulse rounded-xl bg-muted/40" />
+              <div key={i} className="h-21.5 animate-pulse rounded-xl bg-muted/40" />
             ))}
           </div>
         ) : isError ? (
@@ -43,11 +49,11 @@ export default function Page() {
             </Button>
           </div>
         ) : (
-          <ProjectList projects={projects} selected={selected} onSelect={setSelected} />
+          <ProjectList projects={projects} selected={selectedName} onSelect={setSelected} />
         )
       }
     >
-      {!selected ? (
+      {!selectedName ? (
         <div className="rounded-2xl border border-dashed bg-card px-6 py-14 text-center">
           <p className="text-sm font-[650]">Select a project</p>
           <p className="mt-1 text-sm text-muted-foreground">Choose a project on the left to inspect its deploys.</p>
@@ -59,7 +65,7 @@ export default function Page() {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-[18px] font-[700] tracking-tight">{selected}</h1>
+                    <h1 className="text-[18px] font-bold tracking-tight">{selectedName}</h1>
                   {active?.productionDeployId && (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
                       <span className="size-1.5 rounded-full bg-emerald-500" />
@@ -69,13 +75,13 @@ export default function Page() {
                 </div>
                 <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                   {active?.deployCount ?? 0} deploys · last {active?.lastDeploy?.gitSha.slice(0, 7) ?? "—"} ·{" "}
-                  <a
-                    href={`http://localhost:8080/${encodeURIComponent(selected)}/production`}
+                    <a
+                      href={`http://localhost:8080/${encodeURIComponent(selectedName ?? "")}/production`}
                     target="_blank"
                     rel="noreferrer"
                     className="underline decoration-dotted underline-offset-4 hover:text-foreground"
                   >
-                    /{selected}/production →
+                    /{selectedName}/production →
                   </a>
                 </p>
               </div>
@@ -101,7 +107,7 @@ export default function Page() {
             </div>
           </div>
 
-          <DeployHistory project={selected} productionDeployId={active?.productionDeployId} />
+          <DeployHistory project={selectedName} productionDeployId={active?.productionDeployId} />
 
           {/* inline note for step 1 scope */}
           <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-3 font-mono text-[11px] leading-relaxed text-muted-foreground">

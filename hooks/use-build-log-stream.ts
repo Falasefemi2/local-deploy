@@ -13,11 +13,18 @@ export function useBuildLogStream(deployId: string | undefined, enabled = true) 
   const [done, setDone] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
-  React.useEffect(() => {
-    if (!deployId || !enabled) return
+  const [prevKey, setPrevKey] = React.useState(`${enabled}:${deployId}`)
+  if (prevKey !== `${enabled}:${deployId}`) {
+    // New stream target — reset accumulated state during render (React-endorsed
+    // adjust-state-during-render), so the subscription effect stays pure.
+    setPrevKey(`${enabled}:${deployId}`)
     setLines([])
     setDone(false)
     setError(null)
+  }
+
+  React.useEffect(() => {
+    if (!deployId || !enabled) return
 
     const es = new EventSource(`${PORTAL_URL}/api/deploys/${encodeURIComponent(deployId)}/logs`)
 

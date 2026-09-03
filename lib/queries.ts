@@ -12,6 +12,9 @@ export const deploysQuery = (project: string) =>
     queryKey: portalKeys.deploys(project),
     queryFn: ({ signal }) => api.listDeploys(project, signal),
     enabled: !!project,
+    // Keep showing the previous project's list while the new one loads —
+    // avoids the skeleton flash on project switch (isPending stays false).
+    placeholderData: (previousData) => previousData,
   })
 
 export const deployQuery = (deployId: string) =>

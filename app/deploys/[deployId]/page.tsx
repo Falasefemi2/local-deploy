@@ -17,7 +17,7 @@ function Masked({ value }: { value: string }) {
   const [show, setShow] = React.useState(false)
   return (
     <span className="inline-flex items-center gap-2 font-mono text-xs">
-      <span className={cn("rounded bg-muted px-1.5 py-0.5", !show && "blur-[4px] select-none")}>{value}</span>
+      <span className={cn("rounded bg-muted px-1.5 py-0.5", !show && "blur-xs select-none")}>{value}</span>
       <button onClick={() => setShow((v) => !v)} className="text-[11px] font-medium text-muted-foreground underline decoration-dotted underline-offset-4">
         {show ? "hide" : "reveal"}
       </button>
@@ -38,30 +38,26 @@ export default function DeployDetailPage() {
 
   const promote = useMutation({
     mutationFn: () => api.promote(deployId),
-    onMutate: async () => {
-      await qc.cancelQueries({ queryKey: portalKeys.deploy(deployId) })
-      const prev = qc.getQueryData(portalKeys.deploy(deployId))
-      // optimistic: keep status succeeded, show toast would go here
-      return { prev }
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.prev) qc.setQueryData(portalKeys.deploy(deployId), ctx.prev)
-    },
+    // No optimistic update: promote returns { ok: true } and moves the
+    // project's production pointer (projects query), not this deploy record —
+    // there is nothing meaningful to patch. Invalidate and refetch instead.
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["portal"] })
+      qc.invalidateQueries({ queryKey: portalKeys.all })
     },
   })
 
   const redeploy = useMutation({
-    mutationFn: () => {
-      // need path — for local-first, use stored artifact project as hint; user can edit in creation flow
-      // For now require user to provide path via prompt if missing
-      const path = window.prompt("Redeploy from path or GitHub URL:", deploy?.project ?? "")
-      if (!path) return Promise.reject(new Error("cancelled"))
-      return api.redeploy(deployId, path)
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["portal"] }),
+    // Path is collected in the click handler below so the mutation fn stays pure.
+    mutationFn: (path: string) => api.redeploy(deployId, path),
+    onSettled: () => qc.invalidateQueries({ queryKey: portalKeys.all }),
   })
+
+  const onRedeploy = () => {
+    // need path — for local-first, use stored artifact project as hint; user can edit in creation flow
+    const path = window.prompt("Redeploy from path or GitHub URL:", deploy?.project ?? "")
+    if (!path) return
+    redeploy.mutate(path)
+  }
 
   if (isPending) {
     return (
@@ -81,8 +77,6 @@ export default function DeployDetailPage() {
       </PortalShell>
     )
   }
-
-  const isProduction = false // could fetch project summary to know prod, but keep simple
 
   return (
     <PortalShell
@@ -124,7 +118,7 @@ export default function DeployDetailPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => redeploy.mutate()}
+                onClick={onRedeploy}
                 disabled={redeploy.isPending}
                 className="gap-1.5"
               >
